@@ -351,6 +351,155 @@ Format as JSON with keys: key_points, important_findings, actionable_insights, r
         return "\n\n---\n\n".join(parts)
 
 
+class GeminiSummarizer(BaseSummarizer):
+    """Google Gemini-based summarization."""
+
+    def __init__(self):
+        self.settings = get_settings()
+        self.llm_settings = self.settings.llm
+
+        try:
+            import google.generativeai as genai
+            api_key = self._get_api_key()
+            if api_key:
+                genai.configure(api_key=api_key)
+                self.client = genai.GenerativeModel(self.llm_settings.model or "gemini-1.5-pro")
+            else:
+                self.client = None
+        except ImportError:
+            logger.warning("google-generativeai not installed")
+            self.client = None
+
+    def _get_api_key(self) -> Optional[str]:
+        import os
+        return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+
+    async def summarize(
+        self,
+        query: str,
+        contents: list[ExtractedContent],
+        sources: list[SearchResult]
+    ) -> ResearchSummary:
+        """Generate summary using Gemini."""
+        start_time = time.time()
+
+        if not self.client:
+            logger.warning("Gemini not configured, falling back to mock")
+            return self._mock_summary(query, contents, sources, start_time)
+
+        combined_content = self._prepare_content(contents)
+
+        prompt = f"""You are a research analyst. Based on the following content about "{query}", provide a structured summary with:
+1. Key Points (5-7 bullet points)
+2. Important Findings (3-5 findings)
+3. Actionable Insights (3-5 recommendations)
+4. References
+
+Content:
+{combined_content}
+
+Format as JSON with keys: key_points, important_findings, actionable_insights, references."""
+
+        try:
+            import json
+            response = await self.client.generate_content_async(prompt)
+            result_text = response.text
+
+            # Parse JSON response
+            result = json.loads(result_text)
+
+            sections = [
+                SummarySection(
+                    title="Key Points",
+                    content="\n".join(f"• {p}" for p in result.get("key_points", [])),
+                    sources=[str(s.url) for s in sources[:5]]
+                ),
+                SummarySection(
+                    title="Important Findings",
+                    content="\n".join(f"• {f}" for f in result.get("important_findings", [])),
+                    sources=[str(s.url) for s in sources[:5]]
+                ),
+                SummarySection(
+                    title="Actionable Insights",
+                    content="\n".join(f"• {i}" for i in result.get("actionable_insights", [])),
+                    sources=[str(s.url) for s in sources[:5]]
+                ),
+            ]
+
+            return ResearchSummary(
+                query_id="",
+                query=query,
+                sections=sections,
+                key_points=result.get("key_points", []),
+                important_findings=result.get("important_findings", []),
+                actionable_insights=result.get("actionable_insights", []),
+                references=sources,
+                total_sources=len([c for c in contents if c.success]),
+                processing_time=time.time() - start_time
+            )
+
+        except Exception as e:
+            logger.error(f"Gemini summarization failed: {e}")
+            return self._mock_summary(query, contents, sources, start_time)
+
+    def _prepare_content(self, contents: list[ExtractedContent]) -> str:
+        valid_contents = [c for c in contents if c.success and c.content]
+        parts = []
+        for i, content in enumerate(valid_contents[:10]):
+            parts.append(f"[Source {i+1}: {content.title}]\n{content.content[:3000]}")
+        return "\n\n---\n\n".join(parts)
+
+    def _mock_summary(
+        self,
+        query: str,
+        contents: list[ExtractedContent],
+        sources: list[SearchResult],
+        start_time: float
+    ) -> ResearchSummary:
+        """Mock summary for testing without API key."""
+        processing_time = time.time() - start_time
+        valid_contents = [c for c in contents if c.success]
+
+        return ResearchSummary(
+            query_id="",
+            query=query,
+            sections=[
+                SummarySection(
+                    title="Key Points",
+                    content=f"Research summary for: {query}. Found {len(valid_contents)} relevant sources.",
+                    sources=[str(s.url) for s in sources[:3]]
+                ),
+                SummarySection(
+                    title="Important Findings",
+                    content="Key findings from the research sources.",
+                    sources=[str(s.url) for s in sources[:3]]
+                ),
+                SummarySection(
+                    title="Actionable Insights",
+                    content="Recommended actions based on the research.",
+                    sources=[str(s.url) for s in sources[:3]]
+                ),
+            ],
+            key_points=[
+                f"Found {len(valid_contents)} relevant sources for '{query}'",
+                "Multiple perspectives identified across sources",
+                "Key trends and patterns extracted"
+            ],
+            important_findings=[
+                "Significant information gathered from multiple sources",
+                "Consistent themes identified across independent sources"
+            ],
+            actionable_insights=[
+                "Review the detailed sources for specific data points",
+                "Consider follow-up research on identified subtopics",
+                "Validate findings with primary sources where possible"
+            ],
+            references=sources,
+            total_sources=len(valid_contents),
+            processing_time=processing_time
+        )
+
+
 class SummarizerFactory:
     """Factory for creating summarizers."""
 
@@ -363,6 +512,8 @@ class SummarizerFactory:
             return OpenAISummarizer()
         elif provider == "anthropic":
             return AnthropicSummarizer()
+        elif provider == "gemini":
+            return GeminiSummarizer()
         else:
             logger.warning(f"Unknown LLM provider: {provider}, defaulting to OpenAI")
             return OpenAISummarizer()

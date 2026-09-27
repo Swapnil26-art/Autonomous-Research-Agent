@@ -16,7 +16,7 @@ def json_serializer(obj: Any) -> Any:
         return obj.model_dump()
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
-from src.models import ResearchSession, ResearchQuery, ResearchSummary, SearchResult, ExtractedContent
+from src.models import ResearchSession, ResearchQuery, ResearchSummary, SearchResult, ExtractedContent, SearchEngine
 from src.config import get_settings
 
 
