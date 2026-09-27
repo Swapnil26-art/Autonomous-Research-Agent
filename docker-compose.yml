@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  research-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: autonomous-research-agent
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GOOGLE_CSE_ID=${GOOGLE_CSE_ID}
+      - BING_API_KEY=${BING_API_KEY}
+      - SERPER_API_KEY=${SERPER_API_KEY}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./config:/app/config
+    restart: unless-stopped
+    # For interactive use, run with: docker-compose run --rm research-agent research "query"
+
+  # Optional: Add a web interface service in the future
+  # web:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.web
+  #   ports:
+  #     - "8000:8000"
+  #   depends_on:
+  #     - research-agent

@@ -1,0 +1,93 @@
+# Autonomous Research Agent Configuration
+
+app:
+  name: "Autonomous Research Agent"
+  version: "1.0.0"
+  debug: false
+
+# LLM Configuration
+llm:
+  provider: "openai"  # openai, anthropic, local
+  model: "gpt-4-turbo-preview"
+  temperature: 0.3
+  max_tokens: 4000
+  timeout: 60
+
+# Search Configuration
+search:
+  default_engine: "duckduckgo"
+  max_results: 10
+  timeout: 30
+  user_agent: "AutonomousResearchAgent/1.0"
+  engines:
+    duckduckgo:
+      enabled: true
+      max_results: 10
+    google:
+      enabled: false
+      api_key: ""
+      cse_id: ""
+    bing:
+      enabled: false
+      api_key: ""
+    serper:
+      enabled: false
+      api_key: ""
+
+# Extraction Configuration
+extraction:
+  timeout: 15
+  min_content_length: 100
+  max_content_length: 50000
+  remove_selectors:
+    - "nav"
+    - "footer"
+    - "header"
+    - "aside"
+    - ".advertisement"
+    - ".ads"
+    - "#comments"
+    - ".sidebar"
+    - "script"
+    - "style"
+
+# Summarization Configuration
+summarization:
+  chunk_size: 3000
+  chunk_overlap: 200
+  max_chunks: 10
+  summary_sections:
+    - "key_points"
+    - "important_findings"
+    - "actionable_insights"
+    - "references"
+
+# Export Configuration
+export:
+  formats: ["markdown", "pdf"]
+  output_dir: "./output"
+  pdf:
+    page_size: "A4"
+    margin: "2cm"
+    font_family: "Helvetica"
+    font_size: 11
+
+# Memory Configuration
+memory:
+  db_path: "./data/research_agent.db"
+  max_history: 100
+  retention_days: 90
+
+# Parallel Processing
+parallel:
+  max_concurrent_searches: 5
+  max_concurrent_extractions: 3
+  request_delay: 1.0
+
+# Logging
+logging:
+  level: "INFO"
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
+  file: "./logs/agent.log"
+  rotation: "10 MB"
+  retention: "30 days"
